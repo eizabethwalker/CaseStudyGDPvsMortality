@@ -1,0 +1,132 @@
+---
+title: "Association Between *GDP per capita* and *Total Deaths*: Do Higher-Income Countries
+  Experience Lower Death Rates?"
+author: "Elizabeth Walker"
+date: "2025-03-18"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+library(tidyverse)
+library(ggplot2)
+```
+
+## Research Question
+Some experts claim that there is an underlying relationship between socioeconomic standing and death rates, both on an individual level and global level (NLM).  Socioeconmic standing could be a strong factor contributing to death rates. While testing for the global relationship may be more difficult due to confounding varibales and complex interactions, I will try to determine the basic research question: “Does higher *GDP per capita* have a relationship with death rates
+
+## Observations
+The observations are Entity, Code, *GDP per capita* and *Total Deaths*. There are 6,741 Observations. The data is drawn from a general 'population' of countries across the world. It was sampled using GDP measures and the UN's medium-fertility scenario. It tracks data from 1900 to 2023. I believe it is a representative sample as it uses data from different countries with both high, medium and low GDPs. It is strongly inclusive. My data set can be used to prediction as the two data sets use identical years, codes and entities, thus aligning the two data sets enough to predict the relationship between *death rates* and *GDP*.
+
+## Theoretical concepts
+To answer the stated research question, I will address two theoretical constructs.
+
+*GDP* represents the complete market value of goods and services produced within a country during a given period and assumes market efficiency, production boundaries and evaluation methods.
+
+*Death rate* represents the frequency of deaths in a population during a specific duration of time abstracting from individual causes of death and quality of life in health outcome.
+
+## Measures
+I am measuring *GDP* using a basic GDP calculation. The calculation is the avergae economic output per person in a given country per year. The GDP is displayed using international dollars or hypothetical currency to adjust for inflation and difference of living. Considering the BEA or Bureaua of Economic Analysis uses GDP, it can be deemed very reliable. The only fault in GDP calculation is the dismissal of non-market activities [BEA] (https://www.bea.gov/resources/learning-center/what-to-know-gdp).
+
+I am measuring *Death Rate* using the UN's medium-fertility scenario. The scenario relies on the historical trends of fertility, death and/or migration patterns in a given country. I will be using real present data rather than predictive data. The current data (1900-2025) is considerably reliable as it used by a credited organization however the predictive data will never be considered fully reliable as the future is always uncertain.
+
+## Data 
+The data for this project was retrieved from [OurWorldInData.org] (https://ourworldindata.org), and the unit of observation is country-year. The GDP data comes from [GDP per capita Worldbank] (https://ourworldindata.org/grapher/number-of-deaths-per-year), which has 7063 observations. The Death Rate Data comes from [Number of Deaths Per Year] (https://ourworldindata.org/grapher/gdp-per-capita-worldbank ) and produces 18944 observations. The two datasets were cleaned and merged, resulting in a reduction of observations to 6741. The final data set includes 203 different countries and 34 different years running from 1990 to 2023, though not every country appears in every year.
+
+```{r, echo=FALSE}
+gdpData<-read.csv("gdp-per-capita-worldbank.csv", header= TRUE, stringsAsFactors = FALSE)
+numDeathData<-read.csv("number-of-deaths-per-year.csv", header=TRUE, stringsAsFactors=FALSE)
+
+#remove any columns in numDeathData with NA or empty names
+clean_names <- function(df) {
+  invalid_names <- is.na(names(numDeathData)) |
+    names(numDeathData) == ""
+  if (any(invalid_names, na.rm = TRUE)) {
+    message("Removing columns with invalid names: ", paste(ifelse(is.na(names(numDeathData)[invalid_names]), "NA", names(numDeathData)[invalid_names]), collapse = ", "))
+  df <- df[, !invalid_names, drop = FALSE]
+  }
+  return(df)
+}
+gdpData <- clean_names(gdpData)
+numDeathData<- clean_names(numDeathData)
+
+if (ncol(gdpData) >= 4) {
+  gdpData <- gdpData[, 1:4]
+} else {
+  stop("gdpData does not have at least 4 columns.")
+}
+if (ncol(numDeathData) >= 4) {
+  numDeathData <- numDeathData[, 1:4]
+} else {
+  stop("numDeathData does not have at least 4 columns.")
+}
+
+#establish column names for future use
+colnames(gdpData)<- c("Entity","Code","Year","GDP_per_capita")
+colnames(numDeathData)<-c("Entity","Code","Year","Deaths")
+
+```
+
+# Density Plot of GDP across Country-Years (1990-2023) 
+"The following visualization depict the distributions of *GDP* and *Deaths* across country-year.
+
+```{r,echo=FALSE, warning=FALSE, results= 'asis'}
+ggplot(gdpData, aes(x=GDP_per_capita))+
+  geom_density(color='black')+
+  labs(title="Density Plot of *GDP* across country-years", x="GDP", y="Density")+
+  theme_minimal()
+```
+
+The above figure displays a density plot of *GDP*. As displayed, the range is wide starting at zero and ending at 150000 with one mode, in a positively skewed manner. The data suggests that a majority of countries lie above 5000 GDP in 'low GDP'.
+
+
+## Density Plot of *Deaths* across Country-Years(1990-2023)")
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+ggplot(numDeathData, aes(x=Deaths))+
+  geom_density(color='black')+
+  xlim(quantile(numDeathData$Deaths, 0.20, na.rm=TRUE), quantile(numDeathData$Deaths, 0.80, na.rm=TRUE))+
+  labs(title="Density Plot of Deaths across country-years", x="Deaths", y="Density")+
+  theme_minimal()
+```
+The second figure displays a density plot of *Deaths* across country-year. The range exists from 0e+00 to 3e+05. The graph is positively skewed with the mode generally around 5e+04.
+
+## Relationship
+The Relationship between *GDP* and *Death Rate*: 
+In the following visualizations, the research question will be addressed with a regression line across the merged data sets.
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+gdpData<- gdpData%>%
+  filter(!is.na(Entity)& Entity!= "OWID_WRL" & !is.na(GDP_per_capita))
+numDeathData<- numDeathData%>%
+  filter(!is.na(Entity)& Entity!= "OWID_WRL" & !is.na(Deaths))
+
+#merge the data on common columns: Entity, Code and Year
+
+merged_data<- inner_join(gdpData, numDeathData,by= c("Entity", "Code", "Year"))
+
+realData<- merged_data%>%
+  filter(complete.cases(GDP_per_capita, Deaths))
+
+#selectedCountries<- c("Indonesia", "Pakistan", "Brazil", "Bangledesh", "Russia", "Mexico", "Japan", "Ethopia", "Phillippines", "Vietnam")
+#selectedData<- realData%>%
+  #filter(Entity %in% selectedCountries)
+#Scatter plot: GDP per capita vs. Deaths
+ggplot(realData, aes(x=GDP_per_capita, y=Deaths))+
+  geom_point(alpha=0.6) +
+  xlim(quantile(realData$GDP_per_capita, 0.60, na.rm=TRUE), quantile(realData$Deaths, 0.40, na.rm=TRUE))+
+  geom_smooth(method='loess', se=FALSE, color='blue')+
+  theme_minimal()+
+  labs(title="GDP per Capita Vs. Total Deaths", 
+       x= "GDP per capita",
+       y= "Totals Deaths (per year)")
+```
+The blue line represents the conditional mean of *Total Deaths* given *GDP per capita*, effectively modeling the expected value of mortality as a function of income. The surrounding gray ribbon denotes the confidence interval around this estimate, reflecting the degree of statistical uncertainty associated with the mean prediction. The relatively narrow width of the ribbon across the GDP range indicates high precision in the estimate; however the intervals widen at the extremes of the distribution, particularly at very low and high income levels, likely due to smaller sample sizes or higher variance in those regions.
+
+For countries with a *GDP per capita* exceeding approx. $20,000, the estimated mean of *Total Deaths* remains consistently low, as indicated by the flat and near-zero trajectory of the blue line. This pattern suggests that higher-income countries, on average, experience fewer total deaths annually, potentially due to better healthcare infrastructure, higher life expectancy, or more robust public health systems. The limited fluctuation in this range implies low varaibility in mortality outcomes among wealtheir nations.
+
+In contrast, among countries with *GDP per capita* below $20,000, the data exhibit greater heterogeneity. The increased dispersion of individual observations (black dots) and the upward trend of the mean line indicate that lower-income countries are subject to substantially higher and more variable mortality levels. This may be attributable to structural vulnerabilities such as larger population sizes, inadequate healthcare access, or exposure to environmental and infectious disease risks.
+While the dataset appears to be sufficiently large and diverse to support generalizable inference under typical modeling assumptions, the definition of the reference population is not explicitly stated. It remains unclear whether the observations represent all countries in a single year, a time-averaged cross-section, or a panel of countries over multiple years.
+
+## Takeaways
+The visual evidence indicates a negative association between *GDP per capita* and *total mortality*, with wealthier nations exhibiting significantly lower mean death counts. This relationship is not strictly linear, as the majority of the variation is concentrated in the lower-income segment. These findings suggest that economic development may be inversely related to population-level mortality, though the relationship is likely confounded by factors such as population size, demographic structure, and health system capacity. Future research should incorporate controls for these variables and consider longitudinal data to better isolate causal mechanisms and temporal dynamics.
